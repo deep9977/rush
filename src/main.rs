@@ -1,61 +1,36 @@
-
-#[allow(unused_imports)]
-
-use std::io::{self, Write , Error};
-use std::process::exit;
+use std::collections::HashSet;
+mod shell;
+use shell::{Commands,Input};
 
 
 
-enum Commands {
-    Exit,
-    Echo,
-}
-impl Commands{
-    fn handle_command(command: Commands , args: &[String]){
-        match command {
-            Commands::Exit =>{
-                exit(0);
-            }
-            Commands::Echo =>{
-                println!("{}",args.join(" "));
-            } 
-           
-        }
-    }
-}
-
-
-fn main() {
-    loop{
-        print_prompt();
-    // Wait for user input
-        let input = read_command();
+fn main(){
     
-          if input.len() <= 1 {        
+    loop{
+        shell::print_prompt();
+        
+        let tempinput = shell::read_command();
+        match tempinput{
+            Ok(_) =>{} ,
+            Err("no input") => continue,
+            _ =>{},
+        }
+        let input: Input = tempinput.unwrap();
+
+        
+
+        let mut commands: HashSet<&str> = HashSet::new();
+        commands.insert("exit");
+        commands.insert("echo");
+        commands.insert("type");
+
+        if commands.contains(input.command.as_str()){
+            Commands::handle_command(&input);
+        }
+        else {
+            println!("command not found: {}",input.command);
             continue;
         }
-        let inputvector: Vec<String> = input.trim().split_whitespace().map(|s| s.to_string()).collect();
-        let command = &inputvector[0];
-        let args = &inputvector[1..];         
-
-        match command.as_str() {
-            "exit" => Commands::handle_command(Commands::Exit, args),
-            "echo" => Commands::handle_command(Commands::Echo, args),
-            _ => println!("{}: command not found",command.to_string()),
-        }
+    
     }
-
 }
-
-
-fn print_prompt(){
-    let prompt_var = "$ ";
-    print!("{}",prompt_var);
-    io::stdout().flush().unwrap();
-}
-fn read_command() -> String{
-    let mut input = String::new();
-    io::stdin().read_line(&mut  input).unwrap();
-    return input;
-}
-
