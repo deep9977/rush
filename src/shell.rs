@@ -1,13 +1,13 @@
-use std::io::{self, Write};
+use std::{env::{self, current_dir}, fs, io::{self, Write}, process::{self, exit, Output} } ;
 use core::result::Result;
-use std::process::exit;
-use std::env;
-use std::fs;
+
+
 
 pub enum Commands {
     Exit ,
     Echo ,
     Type ,
+    Cd,
     ExternCommand ,
     NotFound,
 }
@@ -17,8 +17,9 @@ impl Commands{
             "exit" => Commands::Exit,
             "echo" => Commands::Echo,
             "type" => Commands::Type,
+            "cd" => Commands::Cd,
             _ => {
-                if let Ok(_) = Self::handle_external_commmand(&input){
+                if let Ok(_) = Self::identify_external_command(&input){
                     Commands::ExternCommand
                 }else{
                     Commands::NotFound
@@ -26,7 +27,7 @@ impl Commands{
             }
         }
     }
-    fn handle_external_commmand(command: &String) -> Result<String , &'static str>{
+    fn identify_external_command(command: &String) -> Result<String , &'static str>{
         let path = env::var("PATH").unwrap();
         let path_s: Vec<&str> = path.split(":").collect();
         let mut found = false;
@@ -55,7 +56,8 @@ impl Commands{
             Commands::Exit => exit(0) ,
             Commands::Echo => Self::echo(&input) ,
             Commands::Type => Self::typefn(&input) ,
-            Commands::ExternCommand => println!("external command "),
+            Commands::Cd => Self::cdfn(&input.args[0]),
+            Commands::ExternCommand => Self::handle_external_command(&input.command, &input.args),
             _ => println!("command not found: {}",input.command),
         }
     }
@@ -65,10 +67,46 @@ impl Commands{
     fn typefn(input: &Input){
         if !matches!(Self::what_command(&input.args[0]) , Commands::NotFound){
             println!("{} is shell builtin",input.args[0].as_str());
-        }else if let Ok(path) = Self::handle_external_commmand(&input.args[0].to_string()){
+        }else if let Ok(path) = Self::identify_external_command(&input.args[0].to_string()){
             println!("{} is {}",input.args[0].as_str(), path);
         }else{
             println!("{} not found",input.args[0].as_str());
+        }
+    }
+    fn cdfn(arg:&String){
+        let mut arg = arg.clone();
+        let mut dir = current_dir().unwrap();
+
+        if arg.contains("~"){
+            let home = env::var("HOME").unwrap();
+            arg = arg.replace("~", home.as_str());
+            dir.clear();
+        }if arg.starts_with("/"){
+            dir.clear();
+        }
+        dir.push(arg);
+
+
+ 
+        if let Err(err) = env::set_current_dir(dir){
+            println!("{}",err);
+        }
+    }
+    fn handle_external_command(command: &String , args: &Vec<String>) {
+        let output: Output = if args.is_empty(){
+            process::Command::new(command).output().unwrap()
+        }else{
+            process::Command::new(command).arg(args.join(" ")).output().unwrap()
+        };
+        
+        if output.status.success(){
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            print!("{}",stdout);
+            io::stdout().flush().unwrap();
+        }else {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            print!("{}",stderr);
+            io::stdout().flush().unwrap();
         }
     }
 }
